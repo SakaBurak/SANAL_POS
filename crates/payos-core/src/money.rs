@@ -1,3 +1,6 @@
+//! Para ve para birimi primitifleri.
+//! Tasarım kararları ve gelecek notları: docs/adr/0001-money-model.md
+
 use std::fmt;
 use std::str::FromStr;
 
