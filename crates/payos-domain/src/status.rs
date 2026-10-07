@@ -1,4 +1,7 @@
 use std::fmt;
+use std::str::FromStr;
+
+use crate::error::ParseStatusError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PaymentStatus {
@@ -69,6 +72,17 @@ impl PaymentStatus {
                     Authorized | Failed | Captured | Voided | PartiallyRefunded | Refunded
                 )
         )
+    }
+}
+
+impl FromStr for PaymentStatus {
+    type Err = ParseStatusError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::ALL
+            .into_iter()
+            .find(|status| status.as_str() == s)
+            .ok_or(ParseStatusError)
     }
 }
 

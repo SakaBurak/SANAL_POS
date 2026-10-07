@@ -15,6 +15,27 @@ pub enum IdError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[error("unknown payment status")]
+pub struct ParseStatusError;
+
+/// Kalıcı kayıttan yüklenen verinin domain kurallarına uymadığını belirtir.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+pub enum RestoreError {
+    #[error("refunded currency differs from payment currency")]
+    CurrencyMismatch,
+    #[error("refunded amount exceeds payment amount")]
+    RefundExceedsAmount,
+    #[error("refunded amount is inconsistent with status {status}")]
+    RefundInconsistentWithStatus { status: PaymentStatus },
+    #[error("unknown context does not match payment status")]
+    UnknownContextMismatch,
+    #[error("version must be at least 1")]
+    InvalidVersion,
+    #[error("updated_at is earlier than created_at")]
+    UpdatedBeforeCreated,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub enum PaymentError {
     #[error("invalid payment transition from {from} to {to}")]
     InvalidTransition {

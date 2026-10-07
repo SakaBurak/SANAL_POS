@@ -9,8 +9,8 @@ pub mod status;
 
 mod prefixed_id;
 
-pub use error::{IdError, PaymentError};
+pub use error::{IdError, ParseStatusError, PaymentError, RestoreError};
 pub use merchant_id::MerchantId;
-pub use payment::{BankOutcome, Payment, PendingOperation};
+pub use payment::{BankOutcome, Payment, PaymentSnapshot, PendingOperation, UnknownSnapshot};
 pub use payment_id::PaymentId;
 pub use status::PaymentStatus;

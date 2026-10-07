@@ -68,7 +68,8 @@ stateDiagram-v2
   komut nesneyi hiç değiştirmez.
 - `version` 1'den başlar ve her başarılı geçişte `checked_add(1)` ile artar;
   `updated_at` komuta verilen zamana ayarlanır. DB katmanı bu alanı koşullu
-  `UPDATE ... WHERE version = $n` ile iyimser kilit olarak kullanacaktır.
+  `UPDATE ... WHERE version = $n` ile iyimser kilit olarak kullanır
+  (ADR 0003).
 - `updated_at` geriye gidemez: komuta verilen zaman son güncellemeden önceyse
   `TimestampBeforeLastUpdate` döner. Eşit zaman kabul edilir. Geçiş kuralı
   ihlali zaman hatasından önce raporlanır.
@@ -115,6 +116,5 @@ yeniden değerlendirilebilir.
 
 ## Kapsam dışı ve gelecek notları
 
-- DB'den nesneyi yeniden oluşturma (`Payment::restore`) ve kalıcılık.
 - Domain olayları ve outbox.
 - Kısmi capture, yetkilendirme süresinin dolması, uyuşmazlık sonuçlandırma.

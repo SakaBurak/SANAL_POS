@@ -1,7 +1,7 @@
 use payos_core::{Money, MoneyError};
-use time::OffsetDateTime;
+use time::{OffsetDateTime, UtcOffset};
 
-use crate::error::PaymentError;
+use crate::error::{PaymentError, RestoreError};
 use crate::merchant_id::MerchantId;
 use crate::payment_id::PaymentId;
 use crate::status::PaymentStatus;
@@ -28,6 +28,29 @@ struct UnknownContext {
     previous: PaymentStatus,
 }
 
+/// `Unknown` durumundaki bir ödemenin bekleyen işlemi ve önceki durumu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnknownSnapshot {
+    pub operation: PendingOperation,
+    pub previous_status: PaymentStatus,
+}
+
+/// `Payment`'ın kalıcı katman için düz hali. Bir snapshot'tan `Payment`
+/// yalnızca `Payment::restore` ile, domain kuralları yeniden doğrulanarak elde
+/// edilir.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PaymentSnapshot {
+    pub id: PaymentId,
+    pub merchant_id: MerchantId,
+    pub amount: Money,
+    pub status: PaymentStatus,
+    pub refunded: Money,
+    pub unknown: Option<UnknownSnapshot>,
+    pub version: u32,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
 /// Ödeme aggregate'i. Durum yalnızca komut metotlarıyla değişir; başarısız bir
 /// komut nesneyi değiştirmez.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,6 +68,7 @@ pub struct Payment {
 
 impl Payment {
     pub fn new(id: PaymentId, merchant_id: MerchantId, amount: Money, now: OffsetDateTime) -> Self {
+        let now = normalize_time(now);
         Self {
             id,
             merchant_id,
@@ -55,6 +79,85 @@ impl Payment {
             version: 1,
             created_at: now,
             updated_at: now,
+        }
+    }
+
+    /// Kalıcı kayıttan ödemeyi yeniden kurar. Komutlarla ulaşılamayacak bir
+    /// durum (tutarsız iade, eksik `Unknown` bağlamı vb.) reddedilir.
+    pub fn restore(snapshot: PaymentSnapshot) -> Result<Self, RestoreError> {
+        if snapshot.version == 0 {
+            return Err(RestoreError::InvalidVersion);
+        }
+        let created_at = normalize_time(snapshot.created_at);
+        let updated_at = normalize_time(snapshot.updated_at);
+        if updated_at < created_at {
+            return Err(RestoreError::UpdatedBeforeCreated);
+        }
+        let amount = snapshot.amount;
+        let refunded = snapshot.refunded;
+        if refunded.currency() != amount.currency() {
+            return Err(RestoreError::CurrencyMismatch);
+        }
+        let remaining = amount
+            .checked_sub(refunded)
+            .map_err(|_| RestoreError::RefundExceedsAmount)?;
+
+        let unknown = match (snapshot.status, snapshot.unknown) {
+            (PaymentStatus::Unknown, Some(ctx)) => {
+                Some(restore_unknown_context(ctx, amount, refunded)?)
+            }
+            (PaymentStatus::Unknown, None) | (_, Some(_)) => {
+                return Err(RestoreError::UnknownContextMismatch);
+            }
+            (_, None) => None,
+        };
+
+        let effective = unknown.map_or(snapshot.status, |ctx| ctx.previous);
+        let consistent = match effective {
+            PaymentStatus::Created
+            | PaymentStatus::RequiresAction
+            | PaymentStatus::Authorized
+            | PaymentStatus::Captured
+            | PaymentStatus::Failed
+            | PaymentStatus::Voided => refunded.is_zero(),
+            PaymentStatus::PartiallyRefunded => !refunded.is_zero() && !remaining.is_zero(),
+            PaymentStatus::Refunded => !refunded.is_zero() && remaining.is_zero(),
+            PaymentStatus::Disputed => refunded.is_zero() || !remaining.is_zero(),
+            PaymentStatus::Unknown => false,
+        };
+        if !consistent {
+            return Err(RestoreError::RefundInconsistentWithStatus {
+                status: snapshot.status,
+            });
+        }
+
+        Ok(Self {
+            id: snapshot.id,
+            merchant_id: snapshot.merchant_id,
+            amount,
+            status: snapshot.status,
+            refunded,
+            unknown,
+            version: snapshot.version,
+            created_at,
+            updated_at,
+        })
+    }
+
+    pub fn snapshot(&self) -> PaymentSnapshot {
+        PaymentSnapshot {
+            id: self.id,
+            merchant_id: self.merchant_id,
+            amount: self.amount,
+            status: self.status,
+            refunded: self.refunded,
+            unknown: self.unknown.map(|ctx| UnknownSnapshot {
+                operation: ctx.operation,
+                previous_status: ctx.previous,
+            }),
+            version: self.version,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
         }
     }
 
@@ -237,6 +340,7 @@ impl Payment {
 
     /// `updated_at` geriye gidemez: `now` son güncellemeden önce olamaz.
     fn next_version(&self, now: OffsetDateTime) -> Result<u32, PaymentError> {
+        let now = normalize_time(now);
         if now < self.updated_at {
             return Err(PaymentError::TimestampBeforeLastUpdate {
                 updated_at: self.updated_at,
@@ -276,6 +380,46 @@ impl Payment {
     fn apply(&mut self, to: PaymentStatus, version: u32, now: OffsetDateTime) {
         self.status = to;
         self.version = version;
-        self.updated_at = now;
+        self.updated_at = normalize_time(now);
     }
+}
+
+/// `mark_unknown`'ın kabul ettiği işlem/önceki durum çiftlerini doğrular.
+fn restore_unknown_context(
+    ctx: UnknownSnapshot,
+    amount: Money,
+    refunded: Money,
+) -> Result<UnknownContext, RestoreError> {
+    let previous = ctx.previous_status;
+    let valid = match ctx.operation {
+        PendingOperation::Authorize => matches!(
+            previous,
+            PaymentStatus::Created | PaymentStatus::RequiresAction
+        ),
+        PendingOperation::Capture | PendingOperation::Void => previous == PaymentStatus::Authorized,
+        PendingOperation::Refund(pending) => {
+            matches!(
+                previous,
+                PaymentStatus::Captured | PaymentStatus::PartiallyRefunded
+            ) && !pending.is_zero()
+                && refunded
+                    .checked_add(pending)
+                    .and_then(|total| amount.checked_sub(total))
+                    .is_ok()
+        }
+    };
+    if !valid {
+        return Err(RestoreError::UnknownContextMismatch);
+    }
+    Ok(UnknownContext {
+        operation: ctx.operation,
+        previous,
+    })
+}
+
+/// Domain zaman çözünürlüğü: UTC ve mikrosaniye. PostgreSQL `timestamptz`
+/// mikrosaniye tuttuğu için kaydedilip geri okunan zaman bire bir aynı kalır.
+fn normalize_time(time: OffsetDateTime) -> OffsetDateTime {
+    let utc = time.checked_to_offset(UtcOffset::UTC).unwrap_or(time);
+    utc.replace_microsecond(utc.microsecond()).unwrap_or(utc)
 }
