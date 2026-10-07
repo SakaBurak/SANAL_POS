@@ -7,3 +7,28 @@ members = [
     "crates/payos-db",
     "crates/payos-api",
 ]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "LicenseRef-Proprietary"
+
+[workspace.dependencies]
+thiserror = "2"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+arithmetic_side_effects = "deny"
+float_arithmetic = "deny"
+dbg_macro = "deny"
+todo = "deny"
+
+[profile.release]
+overflow-checks = true
