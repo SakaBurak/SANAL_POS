@@ -127,7 +127,7 @@ impl Payment {
             });
         }
         let (to, refunded) = self.refund_outcome(amount)?;
-        let version = self.check_command(to)?;
+        let version = self.check_command(to, now)?;
         self.refunded = refunded;
         self.apply(to, version, now);
         Ok(())
@@ -157,7 +157,7 @@ impl Payment {
                 to: PaymentStatus::Unknown,
             });
         }
-        let version = self.check_command(PaymentStatus::Unknown)?;
+        let version = self.check_command(PaymentStatus::Unknown, now)?;
         if let PendingOperation::Refund(amount) = operation {
             self.refund_outcome(amount)?;
         }
@@ -206,7 +206,7 @@ impl Payment {
                 to,
             });
         }
-        let version = self.next_version()?;
+        let version = self.next_version(now)?;
         self.refunded = refunded;
         self.unknown = None;
         self.apply(to, version, now);
@@ -218,24 +218,31 @@ impl Payment {
         to: PaymentStatus,
         now: OffsetDateTime,
     ) -> Result<(), PaymentError> {
-        let version = self.check_command(to)?;
+        let version = self.check_command(to, now)?;
         self.apply(to, version, now);
         Ok(())
     }
 
     /// `Unknown` durumundayken hiçbir komut kabul edilmez; çıkış yalnızca
     /// `resolve_unknown` ile olur.
-    fn check_command(&self, to: PaymentStatus) -> Result<u32, PaymentError> {
+    fn check_command(&self, to: PaymentStatus, now: OffsetDateTime) -> Result<u32, PaymentError> {
         if self.status == PaymentStatus::Unknown || !self.status.can_transition_to(to) {
             return Err(PaymentError::InvalidTransition {
                 from: self.status,
                 to,
             });
         }
-        self.next_version()
+        self.next_version(now)
     }
 
-    fn next_version(&self) -> Result<u32, PaymentError> {
+    /// `updated_at` geriye gidemez: `now` son güncellemeden önce olamaz.
+    fn next_version(&self, now: OffsetDateTime) -> Result<u32, PaymentError> {
+        if now < self.updated_at {
+            return Err(PaymentError::TimestampBeforeLastUpdate {
+                updated_at: self.updated_at,
+                now,
+            });
+        }
         self.version
             .checked_add(1)
             .ok_or(PaymentError::VersionOverflow)

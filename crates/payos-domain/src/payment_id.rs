@@ -9,17 +9,12 @@ use crate::prefixed_id;
 const PREFIX: &str = "pay_";
 
 /// Ödeme kimliği. UUIDv7 olmak zorundadır: partition aralığı içindeki zaman
-/// damgasından türetilir.
+/// damgasından türetilir. UUID üretimi saat okuduğu için uygulama katmanında
+/// yapılır; domain yalnızca hazır UUID'yi doğrular.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PaymentId(Uuid);
 
 impl PaymentId {
-    /// Sistem saatini ve rastgele sayı üretecini kullanır; yalnızca uygulama
-    /// sınırında çağrılmalıdır.
-    pub fn new_v7() -> Self {
-        Self(Uuid::now_v7())
-    }
-
     pub fn from_uuid(uuid: Uuid) -> Result<Self, IdError> {
         if uuid.get_version_num() != 7 {
             return Err(IdError::NotV7);

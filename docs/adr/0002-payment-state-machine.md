@@ -69,6 +69,9 @@ stateDiagram-v2
 - `version` 1'den başlar ve her başarılı geçişte `checked_add(1)` ile artar;
   `updated_at` komuta verilen zamana ayarlanır. DB katmanı bu alanı koşullu
   `UPDATE ... WHERE version = $n` ile iyimser kilit olarak kullanacaktır.
+- `updated_at` geriye gidemez: komuta verilen zaman son güncellemeden önceyse
+  `TimestampBeforeLastUpdate` döner. Eşit zaman kabul edilir. Geçiş kuralı
+  ihlali zaman hatasından önce raporlanır.
 - Capture her zaman tam tutardır.
 - İade: para birimi aynı olmalı, sıfır iade reddedilir, toplam iade capture
   tutarını aşamaz. Toplam eşitse `refunded`, değilse `partially_refunded`.
@@ -95,6 +98,10 @@ iade belirsizliğinde yanlış sonuç vermesini önler.
 
 - `PaymentId`: UUIDv7 zorunludur (partition aralığı zaman damgasından
   türetilir). Kanonik metin biçimi `pay_` + 32 küçük harf hex.
+- UUID üretimi sistem saatini okuduğu için domain'de yapılmaz; uygulama/API
+  katmanı UUIDv7 üretir, domain `PaymentId::from_uuid` ile yalnızca doğrular.
+  Bunu derleme düzeyinde güvenceye almak için domain'in `uuid` bağımlılığında
+  `v7` özelliği (`Uuid::now_v7`) açık değildir.
 - `MerchantId`: `mer_` + 32 küçük harf hex; sürüm kısıtı yoktur.
 
 ## Reddedilen alternatif
