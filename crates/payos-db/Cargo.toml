@@ -6,6 +6,12 @@ publish.workspace = true
 license.workspace = true
 
 [dependencies]
+payos-core.workspace = true
+payos-domain.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+uuid.workspace = true
 
 [lints]
 workspace = true

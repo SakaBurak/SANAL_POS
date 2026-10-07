@@ -16,6 +16,15 @@ license = "LicenseRef-Proprietary"
 
 [workspace.dependencies]
 payos-core = { path = "crates/payos-core" }
+payos-domain = { path = "crates/payos-domain" }
+sqlx = { version = "0.9", default-features = false, features = [
+    "runtime-tokio",
+    "postgres",
+    "uuid",
+    "time",
+    "migrate",
+    "macros",
+] }
 thiserror = "2"
 time = "0.3"
 uuid = "1"

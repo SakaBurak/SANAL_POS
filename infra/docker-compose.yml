@@ -1,0 +1,22 @@
+name: payos
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: payos
+      POSTGRES_PASSWORD: payos
+      POSTGRES_DB: payos
+    # Makinede kurulu bir PostgreSQL ile çakışmaması için 5432 yerine 55432.
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payos -d payos"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres-data:
