@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "crates/payos-core",
+    "crates/payos-domain",
+    "crates/payos-db",
+    "crates/payos-api",
+]

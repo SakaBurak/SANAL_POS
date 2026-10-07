@@ -1,0 +1,35 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.p12
+
+# Node / Frontend
+node_modules/
+.next/
+dist/
+
+# Local database
+*.sqlite
+*.sqlite3
+*.db
