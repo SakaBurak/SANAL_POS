@@ -15,7 +15,10 @@ publish = false
 license = "LicenseRef-Proprietary"
 
 [workspace.dependencies]
+payos-core = { path = "crates/payos-core" }
 thiserror = "2"
+time = "0.3"
+uuid = { version = "1", features = ["v7"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
