@@ -20,6 +20,27 @@ jobs:
   check:
     name: fmt, clippy, test
     runs-on: ubuntu-latest
+
+    # payos-db entegrasyon testleri (#[sqlx::test]) her test için bu sunucuda
+    # ayrı bir veritabanı açar.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: payos
+          POSTGRES_PASSWORD: payos
+          POSTGRES_DB: payos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U payos -d payos"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+
+    env:
+      DATABASE_URL: postgres://payos:payos@localhost:5432/payos
+
     steps:
       - uses: actions/checkout@v7
 

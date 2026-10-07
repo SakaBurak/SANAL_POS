@@ -22,6 +22,21 @@ Early development / architecture phase.
 - `docs` - Teknik mimari ve ADR dokümanları
 - `infra` - Altyapı dosyaları
 
+## Local Development
+
+`payos-db` testleri canlı bir PostgreSQL ister. `#[sqlx::test]` her test için
+ayrı bir veritabanı açıp migration'ları uygular ve test bitince siler.
+
+```powershell
+docker compose -f infra/docker-compose.yml up -d --wait
+$env:DATABASE_URL = "postgres://payos:payos@localhost:55432/payos"   # bash: export DATABASE_URL=...
+cargo test --workspace
+```
+
+`DATABASE_URL` için `.env.example` dosyasını `.env` olarak kopyalamak da
+yeterlidir. Docker'daki Postgres, makinede kurulu bir PostgreSQL ile
+çakışmaması için 55432 portunu kullanır.
+
 ## Security
 
 API anahtarları, banka bilgileri, kart verileri, private key'ler ve production secret'ları repository'e commit edilmemelidir.
