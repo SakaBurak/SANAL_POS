@@ -1,5 +1,6 @@
 use payos_core::MoneyError;
 use thiserror::Error;
+use time::OffsetDateTime;
 
 use crate::status::PaymentStatus;
 
@@ -28,6 +29,11 @@ pub enum PaymentError {
     RefundExceedsCaptured,
     #[error("payment version overflow")]
     VersionOverflow,
+    #[error("timestamp {now} is earlier than last update {updated_at}")]
+    TimestampBeforeLastUpdate {
+        updated_at: OffsetDateTime,
+        now: OffsetDateTime,
+    },
     #[error(transparent)]
     Money(#[from] MoneyError),
 }

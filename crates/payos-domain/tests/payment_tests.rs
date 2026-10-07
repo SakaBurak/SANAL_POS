@@ -270,6 +270,63 @@ fn dispute_is_allowed_after_capture_and_partial_refund() {
     );
 }
 
+// --- Zaman: updated_at geriye gidemez ---
+
+#[test]
+fn rejects_timestamp_earlier_than_last_update() {
+    let mut p = payment_in(PaymentStatus::Captured);
+    let before = p.clone();
+    let expected = Err(PaymentError::TimestampBeforeLastUpdate {
+        updated_at: at(2),
+        now: at(1),
+    });
+
+    assert_eq!(p.refund(try_money(100), at(1)), expected);
+    assert_eq!(p.dispute(at(1)), expected);
+    assert_eq!(
+        p.mark_unknown(PendingOperation::Refund(try_money(100)), at(1)),
+        expected
+    );
+    assert_eq!(p, before);
+}
+
+#[test]
+fn rejects_earlier_timestamp_when_resolving_unknown() {
+    let mut p = payment_in(PaymentStatus::Authorized);
+    p.mark_unknown(PendingOperation::Capture, at(10)).unwrap();
+    let before = p.clone();
+
+    assert_eq!(
+        p.resolve_unknown(BankOutcome::Approved, at(9)),
+        Err(PaymentError::TimestampBeforeLastUpdate {
+            updated_at: at(10),
+            now: at(9),
+        })
+    );
+    assert_eq!(p, before);
+}
+
+#[test]
+fn accepts_timestamp_equal_to_last_update() {
+    let mut p = new_payment();
+
+    p.authorize(at(0)).unwrap();
+    p.capture(at(0)).unwrap();
+
+    assert_eq!(p.status(), PaymentStatus::Captured);
+    assert_eq!(p.updated_at(), at(0));
+}
+
+#[test]
+fn invalid_transition_is_reported_before_timestamp_error() {
+    let mut p = payment_in(PaymentStatus::Captured);
+
+    assert_eq!(
+        p.authorize(at(0)),
+        invalid(PaymentStatus::Captured, PaymentStatus::Authorized)
+    );
+}
+
 // --- Unknown: işlem-bilinçli çözüm ---
 
 #[allow(clippy::unwrap_used)]

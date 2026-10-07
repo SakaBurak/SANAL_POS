@@ -21,11 +21,12 @@ fn payment_id_round_trips_through_canonical_string() {
 }
 
 #[test]
-fn generated_payment_id_is_v7() {
-    let id = PaymentId::new_v7();
+fn payment_id_accepts_v7_uuid() {
+    let uuid = v7_uuid();
+    let id = PaymentId::from_uuid(uuid).unwrap();
 
+    assert_eq!(id.as_uuid(), &uuid);
     assert_eq!(id.as_uuid().get_version_num(), 7);
-    assert_eq!(id.to_string().parse::<PaymentId>(), Ok(id));
 }
 
 #[test]
